@@ -1,43 +1,77 @@
 import streamlit as st
 import pandas as pd
-import nltk
 import string
-from nltk.corpus import stopwords
-from nltk.stem import WordNetLemmatizer
+import re
+
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
-nltk.download('stopwords')
-nltk.download('wordnet')
-
-# Load dataset
-data = pd.read_csv("fake_news.csv")
-
-lemmatizer = WordNetLemmatizer()
-stop_words = set(stopwords.words('english'))
-
-def preprocess(text):
-    text = text.lower()
-    text = text.translate(str.maketrans('', '', string.punctuation))
-    words = text.split()
-    words = [lemmatizer.lemmatize(w) for w in words if w not in stop_words]
-    return " ".join(words)
-
-data["clean_text"] = data["text"].apply(preprocess)
-
-vectorizer = TfidfVectorizer()
-X = vectorizer.fit_transform(data["clean_text"])
-y = data["label"]
-
-model = LogisticRegression()
-model.fit(X, y)
-
+# -----------------------------
+# PAGE TITLE
+# -----------------------------
 st.title("Fake News Detection App")
+st.write("Enter a news headline below to check if it is Fake or Real.")
 
+# -----------------------------
+# LOAD DATA
+# -----------------------------
+@st.cache_data
+def load_data():
+    df = pd.read_csv("fake_news.csv")
+    df = df.dropna()
+    return df
+
+df = load_data()
+
+# -----------------------------
+# TEXT CLEANING
+# -----------------------------
+def clean_text(text):
+    text = text.lower()
+    text = re.sub(r'\d+', '', text)
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    return text
+
+df["text"] = df["text"].apply(clean_text)
+
+# -----------------------------
+# TRAIN MODEL
+# -----------------------------
+@st.cache_resource
+def train_model():
+    X = df["text"]
+    y = df["label"]
+
+    vectorizer = TfidfVectorizer(stop_words="english")
+    X_vectorized = vectorizer.fit_transform(X)
+
+    model = LogisticRegression()
+    model.fit(X_vectorized, y)
+
+    return model, vectorizer
+
+model, vectorizer = train_model()
+
+# -----------------------------
+# USER INPUT
+# -----------------------------
 user_input = st.text_area("Enter News Text")
 
 if st.button("Predict"):
-    clean_input = preprocess(user_input)
-    vector_input = vectorizer.transform([clean_input])
-    prediction = model.predict(vector_input)
-    st.success(f"Prediction: {prediction[0]}")
+    if user_input.strip() == "":
+        st.warning("Please enter some text.")
+    else:
+        cleaned = clean_text(user_input)
+        vectorized_input = vectorizer.transform([cleaned])
+
+        prediction = model.predict(vectorized_input)[0]
+        probabilities = model.predict_proba(vectorized_input)[0]
+
+        confidence = max(probabilities) * 100
+
+        if prediction == "fake":
+            st.error(f"Prediction: FAKE NEWS ❌")
+        else:
+            st.success(f"Prediction: REAL NEWS ✅")
+
+        st.write(f"Confidence Score: {confidence:.2f}%")
