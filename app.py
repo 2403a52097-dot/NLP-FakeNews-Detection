@@ -7,9 +7,11 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 
 # -----------------------------
-# PAGE TITLE
+# PAGE CONFIG
 # -----------------------------
-st.title("Fake News Detection App")
+st.set_page_config(page_title="Fake News Detector", page_icon="📰")
+
+st.title("📰 Fake News Detection App")
 st.write("Enter a news headline below to check if it is Fake or Real.")
 
 # -----------------------------
@@ -55,11 +57,12 @@ model, vectorizer = train_model()
 # -----------------------------
 # USER INPUT
 # -----------------------------
-user_input = st.text_area("Enter News Text")
+user_input = st.text_area("Enter News Text", height=150)
 
-if st.button("Predict"):
+if st.button("🔍 Predict", use_container_width=True):
+
     if user_input.strip() == "":
-        st.warning("Please enter some text.")
+        st.warning("⚠ Please enter some text.")
     else:
         cleaned = clean_text(user_input)
         vectorized_input = vectorizer.transform([cleaned])
@@ -67,11 +70,15 @@ if st.button("Predict"):
         prediction = model.predict(vectorized_input)[0]
         probabilities = model.predict_proba(vectorized_input)[0]
 
+        # Take only confidence of predicted class
         confidence = max(probabilities) * 100
 
-        if prediction == "fake":
-            st.error(f"Prediction: FAKE NEWS ❌")
-        else:
-            st.success(f"Prediction: REAL NEWS ✅")
+        st.markdown("---")
 
-        st.write(f"Confidence Score: {confidence:.2f}%")
+        if prediction.lower() == "fake":
+            st.error("🚨 Prediction: FAKE NEWS")
+        else:
+            st.success("✅ Prediction: REAL NEWS")
+
+        st.write(f"### Confidence Score: {confidence:.2f}%")
+        st.progress(int(confidence))
